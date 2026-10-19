@@ -28,6 +28,23 @@ func (s *Server) webuiHandler() http.Handler {
 	}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		p := strings.TrimPrefix(path.Clean(r.URL.Path), "/")
+
+		// 客户端路由要的 RSC 载荷：trailingSlash 导出下，路由 /a/b 的载荷
+		// 实际文件是 a/b/index.txt，但 Next 客户端请求的是 /a/b.txt。
+		// 不把两者对上，请求会落到下面的 index.html 兜底，客户端拿到 HTML
+		// 解析 RSC 失败 → 每次点导航都报 "This page couldn't load"。
+		if strings.HasSuffix(p, ".txt") {
+			base := strings.TrimSuffix(p, ".txt")
+			for _, cand := range []string{base + "/index.txt", base + ".txt"} {
+				if serveFileIfExists(w, r, root, cand) {
+					return
+				}
+			}
+			// 载荷确实不存在时明确 404，不要再回落成 HTML。
+			http.NotFound(w, r)
+			return
+		}
+
 		if p == "" {
 			p = "index.html"
 		}
