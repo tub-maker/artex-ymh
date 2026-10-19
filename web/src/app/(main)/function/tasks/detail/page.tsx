@@ -349,7 +349,7 @@ function TaskDetailInner() {
     <Tabs value={tab} onValueChange={setTab} className="flex flex-1 flex-col gap-0">
       {/* Top fixed area */}
       <header className="sticky top-0 z-10 flex flex-col gap-2 border-b bg-background/95 px-4 py-2.5 backdrop-blur lg:px-6">
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <SidebarTrigger className="-ml-1" />
           <Button asChild variant="ghost" size="icon" className="size-7">
             <Link href="/function/tasks">
@@ -392,7 +392,8 @@ function TaskDetailInner() {
           )}
           <Button size="sm" variant={controlVariant} onClick={togglePause} disabled={terminal}>
             {controlIcon}
-            {controlLabel}
+            {/* 手机端只留图标，否则右侧按钮把标签栏挤出屏幕 */}
+            <span className="hidden sm:inline">{controlLabel}</span>
           </Button>
         </div>
         <p className="truncate text-xs text-muted-foreground">{task.goal}</p>

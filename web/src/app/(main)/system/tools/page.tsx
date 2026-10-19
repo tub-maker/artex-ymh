@@ -675,7 +675,7 @@ function CustomToolDialog({
     <Sheet open={!!edit} onOpenChange={(o) => !o && onClose()}>
       <SheetContent
         side="right"
-        className="flex flex-col gap-0 p-0 data-[side=right]:w-[45vw] data-[side=right]:sm:max-w-[45vw] data-[side=right]:min-w-[480px]"
+        className="flex flex-col gap-0 p-0 data-[side=right]:w-full data-[side=right]:min-w-0 data-[side=right]:sm:w-[45vw] data-[side=right]:sm:max-w-[45vw] data-[side=right]:sm:min-w-[480px]"
       >
         <SheetHeader className="px-4">
           <SheetTitle>{isNew ? "新建自定义工具" : `编辑 ${tool?.key}`}</SheetTitle>
