@@ -6,7 +6,9 @@ import (
 	"embed"
 	"io/fs"
 	"net/http"
+	"os"
 	"path"
+	"path/filepath"
 	"strings"
 )
 
@@ -28,6 +30,16 @@ func (s *Server) webuiHandler() http.Handler {
 	}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		p := strings.TrimPrefix(path.Clean(r.URL.Path), "/")
+
+		// 移动端 SPA（artex-mobile 仓库）：从挂载目录提供，不在二进制里。
+		// 这样移动端改一行代码只要 `npm run build`，刷新手机就生效，不用重建镜像。
+		if p == "m" || strings.HasPrefix(p, "m/") {
+			if serveMobile(w, r, p) {
+				return
+			}
+			http.NotFound(w, r)
+			return
+		}
 
 		// 客户端路由要的 RSC 载荷：trailingSlash 导出下，路由 /a/b 的载荷
 		// 实际文件是 a/b/index.txt，但 Next 客户端请求的是 /a/b.txt。
@@ -59,6 +71,44 @@ func (s *Server) webuiHandler() http.Handler {
 		}
 		http.ServeFileFS(w, r, root, "index.html")
 	})
+}
+
+// serveMobile 从挂载目录提供移动端 SPA（artex-mobile 仓库的 dist）。
+//
+// 为什么不用 embed：移动端迭代频繁，打进二进制意味着每改一次样式都要重建镜像。
+// 挂载目录后只需 `npm run build`，刷新手机即可生效。
+func serveMobile(w http.ResponseWriter, r *http.Request, p string) bool {
+	dir := strings.TrimSpace(os.Getenv("ARTEX_MOBILE_DIR"))
+	if dir == "" {
+		dir = "/app/mobile"
+	}
+	if st, err := os.Stat(dir); err != nil || !st.IsDir() {
+		return false
+	}
+
+	// p 形如 "m" / "m/" / "m/assets/index.js"
+	rel := strings.TrimPrefix(strings.TrimPrefix(p, "m"), "/")
+	if rel == "" {
+		rel = "index.html"
+	}
+	// 防目录穿越
+	if strings.Contains(rel, "..") {
+		return false
+	}
+
+	full := filepath.Join(dir, filepath.FromSlash(rel))
+	if st, err := os.Stat(full); err == nil && !st.IsDir() {
+		http.ServeFile(w, r, full)
+		return true
+	}
+
+	// SPA 兜底：未知路径一律回 index.html，交给前端路由
+	idx := filepath.Join(dir, "index.html")
+	if _, err := os.Stat(idx); err != nil {
+		return false
+	}
+	http.ServeFile(w, r, idx)
+	return true
 }
 
 // serveFileIfExists serves name from fsys when it exists as a regular file.
