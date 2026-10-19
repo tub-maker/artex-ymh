@@ -141,8 +141,8 @@ export function FindingsTable({
   }
 
   return (
-    /* 固定列宽保证展开内容不撑开表格；窄屏只在表格内部横向滚动。 */
-    <Table className="min-w-[60rem] table-fixed">
+    /* 移动端：去掉最小宽度，改为横向滚动；PC 保持原宽。 */
+    <Table className="w-full min-w-[40rem] table-fixed md:min-w-[60rem]">
       <TableHeader>
         <TableRow>
           <TableHead className="w-8">

@@ -52,27 +52,28 @@ export function MainContent({ children }: { children: ReactNode }) {
           "[html[data-navbar-style=sticky]_&]:sticky [html[data-navbar-style=sticky]_&]:top-0 [html[data-navbar-style=sticky]_&]:z-50 [html[data-navbar-style=sticky]_&]:overflow-hidden [html[data-navbar-style=sticky]_&]:rounded-t-[inherit] [html[data-navbar-style=sticky]_&]:bg-background/50 [html[data-navbar-style=sticky]_&]:backdrop-blur-md",
         )}
       >
-        <div className="flex w-full items-center justify-between px-4 lg:px-6">
-          <div className="flex items-center gap-1 lg:gap-2">
+        <div className="flex w-full items-center justify-between px-3 py-2 sm:px-4 lg:px-6">
+          <div className="flex items-center gap-1">
             <SidebarTrigger className="-ml-1" />
             <Separator
               orientation="vertical"
-              className="mx-2 data-[orientation=vertical]:h-4 data-[orientation=vertical]:self-center"
+              className="mx-1 data-[orientation=vertical]:h-4 data-[orientation=vertical]:self-center sm:mx-2"
             />
             <SearchDialog />
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1">
+            {/* 手机端：只保留版本号和账户切换，其余隐藏 */}
             {version && (
-              <span className="font-medium text-muted-foreground text-xs tabular-nums">版本 · {version}</span>
+              <span className="hidden font-medium text-muted-foreground text-[10px] tabular-nums sm:inline">版本 · {version}</span>
             )}
-            <UpdateBadge />
-            <LayoutControls />
-            <ThemeSwitcher />
+            <UpdateBadge className="hidden sm:inline-flex" />
+            <LayoutControls className="hidden sm:inline-flex" />
+            <ThemeSwitcher className="hidden sm:inline-flex" />
             <AccountSwitcher users={[currentUser]} />
           </div>
         </div>
       </header>
-      <div className="min-h-0 min-w-0 flex-1 overflow-x-hidden p-4 has-data-[content-padding=false]:p-0 md:p-6 md:has-data-[content-padding=false]:p-0">
+      <div className="min-h-0 min-w-0 flex-1 overflow-x-hidden p-3 has-data-[content-padding=false]:p-0 md:p-6 md:has-data-[content-padding=false]:p-0">
         {children}
       </div>
     </>
