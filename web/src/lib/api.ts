@@ -190,10 +190,22 @@ function mockReport(_task?: string): string {
 > （demo）本报告由 mock 数据生成，仅用于界面演示。`;
 }
 
+// defaultSseBase picks the SSE origin when NEXT_PUBLIC_SSE_BASE is unset.
+//
+// Next.js dev server (usually :3000) rewrites `/api` and buffers streamed
+// responses, so SSE must talk to the Go backend directly.
+// In production the page is either served by the Go binary itself or sits behind
+// a reverse proxy / tunnel that only exposes 443 — there, a hard-coded :8787 is
+// unreachable, so same-origin is the only base that works for mobile clients.
+function defaultSseBase(): string {
+  if (typeof window === "undefined") return "";
+  const { protocol, hostname, port, origin } = window.location;
+  if (port === "3000") return `${protocol}//${hostname}:8787`;
+  return origin;
+}
+
 export async function sseUrl(path: string): Promise<string> {
-  const base =
-    process.env.NEXT_PUBLIC_SSE_BASE ??
-    (typeof window !== "undefined" ? `${window.location.protocol}//${window.location.hostname}:8787` : "");
+  const base = process.env.NEXT_PUBLIC_SSE_BASE ?? defaultSseBase();
   const { ticket } = await post<{ ticket: string }>("/sse-ticket");
   const sep = path.includes("?") ? "&" : "?";
   return `${base}${path}${sep}ticket=${encodeURIComponent(ticket)}`;
