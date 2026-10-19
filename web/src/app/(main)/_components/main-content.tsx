@@ -66,9 +66,15 @@ export function MainContent({ children }: { children: ReactNode }) {
             {version && (
               <span className="hidden font-medium text-muted-foreground text-[10px] tabular-nums sm:inline">版本 · {version}</span>
             )}
-            <UpdateBadge className="hidden sm:inline-flex" />
-            <LayoutControls className="hidden sm:inline-flex" />
-            <ThemeSwitcher className="hidden sm:inline-flex" />
+            <span className="hidden sm:inline-flex">
+              <UpdateBadge />
+            </span>
+            <span className="hidden sm:inline-flex">
+              <LayoutControls />
+            </span>
+            <span className="hidden sm:inline-flex">
+              <ThemeSwitcher />
+            </span>
             <AccountSwitcher users={[currentUser]} />
           </div>
         </div>
