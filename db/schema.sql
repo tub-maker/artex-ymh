@@ -1354,3 +1354,18 @@ CREATE INDEX IF NOT EXISTS idx_tunnels_state ON tunnels(state);
 -- honeypot_evidence: 命中签名证据,JSON 数组文本(如 ["cowrie_default_ssh_banner(Cowrie, 0.99)"]),合并去重。
 ALTER TABLE assets ADD COLUMN IF NOT EXISTS honeypot_score REAL NOT NULL DEFAULT 0;
 ALTER TABLE assets ADD COLUMN IF NOT EXISTS honeypot_evidence TEXT NOT NULL DEFAULT '';
+
+-- =====================================================================
+-- N. Web Push 订阅（移动端推送通知）
+-- =====================================================================
+-- endpoint 是浏览器下发的唯一推送地址；p256dh/auth 是消息加密所需的
+-- 客户端公钥与认证密钥（base64url）。一台设备一条，重复订阅走 upsert。
+CREATE TABLE IF NOT EXISTS push_subscriptions (
+    id         BIGSERIAL PRIMARY KEY,
+    endpoint   TEXT NOT NULL UNIQUE,
+    p256dh     TEXT NOT NULL,
+    auth       TEXT NOT NULL,
+    ua         TEXT NOT NULL DEFAULT '',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    last_ok_at TIMESTAMPTZ
+);

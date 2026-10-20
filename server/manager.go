@@ -1090,8 +1090,8 @@ func newTarpitConfig(pg *pgdb.DB, store *pgdb.ExplorationStore) guard.TarpitConf
 
 func taskFromPG(pt *pgdb.Task, store *pgdb.ExplorationStore, ic *intercept.Interceptor, pg *pgdb.DB, eg *guard.EgressGuard) *Task {
 	g := guard.NewWithInterceptor(ic)
-	g.SetRoE(newRoEConfig(pg))          // RoE 范围强制(F5):worker 的 Bash/HTTP 目标与 task_scope 比对
-	g.SetEgress(eg)                     // 批 5 B2 出口审查:进程级共享指纹集合
+	g.SetRoE(newRoEConfig(pg))              // RoE 范围强制(F5):worker 的 Bash/HTTP 目标与 task_scope 比对
+	g.SetEgress(eg)                         // 批 5 B2 出口审查:进程级共享指纹集合
 	g.SetTarpit(newTarpitConfig(pg, store)) // 批 5 B3 tarpit 熔断(每任务计数,重启清零)
 	return &Task{
 		ID: strconv.FormatInt(pt.ID, 10), ExpID: pt.ExplorationID,
@@ -1680,7 +1680,13 @@ func (m *Manager) SetTaskStatus(id, status string) error {
 		return err
 	}
 	m.mu.Lock()
+	var prevStatus, taskLabel string
 	if t := m.tasks[id]; t != nil {
+		prevStatus = t.lifecycleSnapshot().Status
+		taskLabel = t.Name
+		if taskLabel == "" {
+			taskLabel = t.Description
+		}
 		t.updateLifecycle(func(state *taskLifecycleState) {
 			state.Status = status
 			// Mirror the DB's completed_at stamp on the live handle so the DTO shows
@@ -1695,6 +1701,25 @@ func (m *Manager) SetTaskStatus(id, status string) error {
 		})
 	}
 	m.mu.Unlock()
+
+	// 任务进入终态时推送到手机。异步执行，不阻塞状态写入；
+	// 只在「非终态 -> 终态」跳变时发，避免重复通知。
+	if pgdb.IsTerminal(status) && !pgdb.IsTerminal(prevStatus) && pushNotifier != nil {
+		title := "任务已结束"
+		switch status {
+		case "done":
+			title = "任务已完成"
+		case "failed":
+			title = "任务失败"
+		case "timeout":
+			title = "任务超时"
+		}
+		body := taskLabel
+		if body == "" {
+			body = "任务 #" + id
+		}
+		go pushNotifier(title, body, "/m/tasks/"+id)
+	}
 	return nil
 }
 

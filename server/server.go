@@ -160,10 +160,12 @@ func New(ctx context.Context, m *Manager, skillDir string, dataDir string, keyDi
 		chatCancel: map[string]context.CancelCauseFunc{}, triggerQ: map[string][]triggeredRun{},
 		triggerActive: map[string]int{}, triggerCfg: map[string]triggerBehavior{},
 		profChatAgents: map[int64]*agent.ChatAgent{},
-		provByProfile: map[int64]*provEntry{}, llmHealth: newLLMHealthRegistry(m.pg),
+		provByProfile:  map[int64]*provEntry{}, llmHealth: newLLMHealthRegistry(m.pg),
 		taskAgents: map[string]*taskAgentBundle{}, archiveWake: make(chan struct{}, 1)}
 	s.initSideQuestions()
-	s.initStage(dataDir) // 受管文件投递暂存(F13);失败降级为关闭,不影响启动
+	// Web Push：把推送发送器挂到包级回调上，供 Manager 在任务终态时触发。
+	pushNotifier = s.NotifyPush
+	s.initStage(dataDir)        // 受管文件投递暂存(F13);失败降级为关闭,不影响启动
 	checkToolsManifest(dataDir) // 期 6 外部工具清单自检(缺失常态,只打汇总日志)
 	// 熔断阈值/冷却是失败路径上的热参数，启动时把全局重试策略推给 Registry 一次；
 	// 之后每次保存策略再推一次（saveLLMRetryPolicy）。
@@ -703,6 +705,12 @@ func (s *Server) Handler() http.Handler {
 	// ?ticket= 连接,不再把 access token 放进 URL。
 	mux.HandleFunc("POST /api/sse-ticket", s.sseTicket)
 
+	// Web Push 通知（移动端）：VAPID 公钥、订阅、退订、状态
+	mux.HandleFunc("GET /api/push/vapid", s.pushVAPID)
+	mux.HandleFunc("POST /api/push/subscribe", s.pushSubscribe)
+	mux.HandleFunc("POST /api/push/unsubscribe", s.pushUnsubscribe)
+	mux.HandleFunc("GET /api/push/status", s.pushStatus)
+
 	mux.HandleFunc("GET /api/health", s.health)
 	mux.HandleFunc("GET /api/stats", s.stats)
 	mux.HandleFunc("GET /api/logs", s.getLogs)
@@ -757,8 +765,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/tasks/{id}/scope", s.taskScopeList)
 	mux.HandleFunc("POST /api/tasks/{id}/scope", s.taskScopeAdd)
 	mux.HandleFunc("DELETE /api/tasks/{id}/scope/{sid}", s.taskScopeDelete)
-	mux.HandleFunc("GET /api/tasks/{id}/pending-scope", s.pendingScopeList)   // 期 4:待授权网段列表
-	mux.HandleFunc("POST /api/pending-scope/{id}/decide", s.pendingScopeDecide) // 期 4:审批扩 scope
+	mux.HandleFunc("GET /api/tasks/{id}/pending-scope", s.pendingScopeList)        // 期 4:待授权网段列表
+	mux.HandleFunc("POST /api/pending-scope/{id}/decide", s.pendingScopeDecide)    // 期 4:审批扩 scope
 	mux.HandleFunc("GET /api/tasks/{id}/goals", s.listGoals)                       // 目标管理:列出本任务全部目标
 	mux.HandleFunc("POST /api/tasks/{id}/goals", s.addGoal)                        // 目标管理:人工新增目标(复活任务)
 	mux.HandleFunc("PATCH /api/tasks/{id}/goals/{gid}", s.editGoal)                // 目标管理:修改目标(复活任务)
