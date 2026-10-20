@@ -710,6 +710,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/push/subscribe", s.pushSubscribe)
 	mux.HandleFunc("POST /api/push/unsubscribe", s.pushUnsubscribe)
 	mux.HandleFunc("GET /api/push/status", s.pushStatus)
+	mux.HandleFunc("POST /api/push/test", s.pushTest)
 
 	mux.HandleFunc("GET /api/health", s.health)
 	mux.HandleFunc("GET /api/stats", s.stats)

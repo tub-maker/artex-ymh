@@ -129,6 +129,25 @@ func (s *Server) pushUnsubscribe(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 200, map[string]any{"ok": true})
 }
 
+// POST /api/push/test — 发一条测试通知，用于验证链路。
+func (s *Server) pushTest(w http.ResponseWriter, r *http.Request) {
+	d := s.pg(w)
+	if d == nil {
+		return
+	}
+	n, err := d.CountPushSubscriptions()
+	if err != nil {
+		writeErr(w, 500, err.Error())
+		return
+	}
+	if n == 0 {
+		writeErr(w, 400, "还没有订阅，请先在设置里开启通知")
+		return
+	}
+	s.NotifyPush("ARTEX 测试通知", "看到这条说明推送链路是通的", "/m/")
+	writeJSON(w, 200, map[string]any{"ok": true, "sent_to": n})
+}
+
 // GET /api/push/status — 前端用来显示"已开启/未开启"。
 func (s *Server) pushStatus(w http.ResponseWriter, r *http.Request) {
 	d := s.pg(w)
