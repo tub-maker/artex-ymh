@@ -375,6 +375,13 @@ func writeDecoy(w http.ResponseWriter) {
 	h := w.Header()
 	h.Set("Server", "nginx")
 	h.Set("Content-Type", "text/html")
+	// 关键：伪装页绝不能进任何缓存。
+	// 它会被按扩展名缓存的 CDN（Cloudflare 默认对 .js/.css/.png 做边缘缓存）
+	// 当成静态资源存下，导致后面带正确 cookie 的请求也拿到伪装页，
+	// 整个前端资源（尤其 sw.js 这种固定文件名）会直接失效。
+	h.Set("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
+	h.Set("Pragma", "no-cache")
+	h.Set("Expires", "0")
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write(decoyPage)
 }

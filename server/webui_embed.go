@@ -98,6 +98,7 @@ func serveMobile(w http.ResponseWriter, r *http.Request, p string) bool {
 
 	full := filepath.Join(dir, filepath.FromSlash(rel))
 	if st, err := os.Stat(full); err == nil && !st.IsDir() {
+		setMobileCacheHeaders(w, rel)
 		http.ServeFile(w, r, full)
 		return true
 	}
@@ -107,8 +108,25 @@ func serveMobile(w http.ResponseWriter, r *http.Request, p string) bool {
 	if _, err := os.Stat(idx); err != nil {
 		return false
 	}
+	w.Header().Set("Cache-Control", "no-cache")
 	http.ServeFile(w, r, idx)
 	return true
+}
+
+// setMobileCacheHeaders 为移动端静态文件设缓存策略。
+//
+// 关键：sw.js 必须 no-cache —— 否则 CDN 或浏览器会缓存旧版本，
+// Service Worker 永远不更新，离线/推送逻辑就卡在旧代码上。
+// 带 hash 的 /m/assets/* 可以长缓存（内容变了文件名就变）。
+func setMobileCacheHeaders(w http.ResponseWriter, rel string) {
+	switch {
+	case rel == "sw.js" || rel == "index.html" || strings.HasSuffix(rel, ".webmanifest"):
+		w.Header().Set("Cache-Control", "no-cache, must-revalidate")
+	case strings.HasPrefix(rel, "assets/"):
+		w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+	default:
+		w.Header().Set("Cache-Control", "public, max-age=3600")
+	}
 }
 
 // serveFileIfExists serves name from fsys when it exists as a regular file.
