@@ -96,6 +96,23 @@ func (s *Server) notifyPendingScope(taskID int64, seg, exampleIP string) {
 	s.engine.emitActivity(t, db.Activity{Worker: "system", Kind: "text",
 		Summary: fmt.Sprintf("发现未授权网段 %s(示例 IP %s),已登记待授权;人工批准后才扩 scope", seg, exampleIP),
 		Detail:  string(detail)})
+
+	// 推送到手机：agent 会停下来等审批，人在外面也能及时处理。
+	// 异步执行，推送失败不影响登记主流程。
+	if pushNotifier != nil {
+		name := t.Name
+		if name == "" {
+			name = t.Description
+		}
+		if name == "" {
+			name = "任务 #" + strconv.FormatInt(taskID, 10)
+		}
+		body := fmt.Sprintf("%s · %s", name, seg)
+		if exampleIP != "" {
+			body += "（示例 IP " + exampleIP + "）"
+		}
+		go pushNotifier("任务请求扩范围", body, "/m/tasks/"+strconv.FormatInt(taskID, 10))
+	}
 }
 
 // GET /api/tasks/{id}/pending-scope — 待授权网段列表(默认只 pending,?all=1 含已决)。
