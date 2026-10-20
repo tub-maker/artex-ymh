@@ -562,7 +562,7 @@ func (s *Server) agentsForTask(t *Task) *taskAgentBundle {
 	tx := transcript.NewStore(filepath.Join(s.m.dir, "transcripts"))
 	window := workerRuntime.CompactionWindow()
 	wk := agent.NewWorker(workerRuntime, "task-router", s.m.dir, tx, window, s.agentMaxTurns("worker"))
-	wk.SetFindingRecorder(s.evidenceStore())
+	wk.SetFindingRecorder(s.findingRecorder())
 	wk.SetCompactionWindowResolver(workerRuntime.CompactionWindow)
 	wk.SetNonStreaming(workerRuntime.nonStreaming) // 按任务当前激活 profile 的流式开关(每轮读)
 	wk.SetMaxTokens(workerRuntime.maxTokens)       // 同上,输出上限也跟随当前激活 profile
@@ -574,7 +574,7 @@ func (s *Server) agentsForTask(t *Task) *taskAgentBundle {
 	wk.SetIntranetResolver(s.taskIntranet)           // 期 4:内网期(立足点/隧道)切 worker.intranet 提示词变体
 	wk.SetUAResolver(s.uaForTask)                    // 批 5 B4:按任务稳定分配的客户端 UA → BashEnv ARTEX_UA
 	pl := agent.NewPlanner(plannerRuntime, "task-router", s.m.dir, tx, plannerRuntime.CompactionWindow(), s.agentMaxTurns("planner"))
-	pl.SetFindingRecorder(s.evidenceStore())
+	pl.SetFindingRecorder(s.findingRecorder())
 	pl.SetCompactionWindowResolver(plannerRuntime.CompactionWindow)
 	pl.SetNonStreaming(plannerRuntime.nonStreaming)
 	pl.SetMaxTokens(plannerRuntime.maxTokens)
@@ -589,7 +589,7 @@ func (s *Server) agentsForTask(t *Task) *taskAgentBundle {
 	// 同模型,随任务 LLM 链解析),压缩用 Complete 一次性生成 body。
 	pl.SetCompactor(agent.NewCompactor(plannerRuntime, "task-router"))
 	main := agent.NewMainAgent(mainRuntime, "task-router", s.m.dir, tx, mainRuntime.CompactionWindow(), s.agentMaxTurns("mainagent"))
-	main.SetFindingRecorder(s.evidenceStore())
+	main.SetFindingRecorder(s.findingRecorder())
 	main.SetCompactionWindowResolver(mainRuntime.CompactionWindow)
 	main.SetNonStreaming(mainRuntime.nonStreaming)
 	main.SetMaxTokens(mainRuntime.maxTokens)
@@ -599,7 +599,7 @@ func (s *Server) agentsForTask(t *Task) *taskAgentBundle {
 	main.SetKillWork(func(intentID int64) error {
 		return s.engine.KillWorkAs(intentID, agent.AbortKilledByMainagent)
 	}) // kill_work：人立即终止运行中 work(killed_by_mainagent)
-	main.SetGuard(s.agentGuard())         // 审批门:mainagent 的工具调用同样过 PreToolUse 拦截
+	main.SetGuard(s.agentGuard()) // 审批门:mainagent 的工具调用同样过 PreToolUse 拦截
 	bundle := &taskAgentBundle{
 		runtime: goalRuntime, plannerRuntime: plannerRuntime, workerRuntime: workerRuntime,
 		mainRuntime: mainRuntime, pl: pl, wk: wk, main: main,

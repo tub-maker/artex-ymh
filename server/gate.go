@@ -30,7 +30,7 @@ const (
 	gateKeyFilename  = "gate.key"  // keyDir 下(与 jwt.key 同处,工作区外),0600
 	gateCookieName   = "artex_gate"
 	defaultGateTTL   = 7 * 24 * time.Hour
-	gateRateLimit    = 10             // 每 IP 每分钟口令尝试上限
+	gateRateLimit    = 10 // 每 IP 每分钟口令尝试上限
 	gateRateWindow   = time.Minute
 )
 
@@ -271,13 +271,50 @@ func (g *Gate) wrap(next http.Handler) http.Handler {
 	})
 }
 
+// clientIP 取真实客户端 IP。
+//
+// 部署在反代（cloudflared / nginx / Tailscale Funnel）后面时，RemoteAddr 恒为
+// 127.0.0.1。若直接拿它做限流计数，所有用户会共用一个桶——一个人输错十次，
+// 全体被锁一分钟。因此连接来自本机/私网（可信反代）时改用 X-Forwarded-For
+// 的首段；公网直连则忽略该头，避免被伪造绕过限流。
+func clientIP(r *http.Request) string {
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil || host == "" {
+		host = r.RemoteAddr
+	}
+	if !isTrustedProxy(host) {
+		return host
+	}
+	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+		if first := strings.TrimSpace(strings.Split(xff, ",")[0]); first != "" {
+			return first
+		}
+	}
+	if xr := strings.TrimSpace(r.Header.Get("X-Real-IP")); xr != "" {
+		return xr
+	}
+	return host
+}
+
+// isTrustedProxy 判定对端是否为可信反代（本机回环或私网地址）。
+func isTrustedProxy(host string) bool {
+	if host == "" {
+		return false
+	}
+	if strings.EqualFold(host, "localhost") {
+		return true
+	}
+	ip := net.ParseIP(host)
+	if ip == nil {
+		return false
+	}
+	return ip.IsLoopback() || ip.IsPrivate()
+}
+
 // handleLogin 校验口令并下发签名 cookie。口令错误、限流命中与错误路径的响应
 // 逐字节一致(都是伪装页),不给出任何枚举信号。
 func (g *Gate) handleLogin(w http.ResponseWriter, r *http.Request) {
-	ip, _, err := net.SplitHostPort(r.RemoteAddr)
-	if err != nil || ip == "" {
-		ip = r.RemoteAddr
-	}
+	ip := clientIP(r)
 	if !g.limiter.allow(ip) {
 		writeDecoy(w)
 		return
