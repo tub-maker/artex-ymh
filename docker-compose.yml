@@ -43,9 +43,10 @@ services:
       # 移动端 SPA 挂载点（由 webuiHandler 以 /m/ 提供）
       ARTEX_MOBILE_DIR: /app/mobile
     ports:
-      # 8787 让给宿主机 nginx（cloudflared 的 origin 固定指向 127.0.0.1:8787），
-      # 容器改用 18787；只绑回环，不对外暴露。
-      - "127.0.0.1:${ARTEX_HOST_PORT:-18787}:${ARTEX_PORT:-8787}"
+      # cloudflared 的 origin 固定指向 127.0.0.1:8787，这里直连容器。
+      # 伪装门控由 ARTeX 自身（server/gate.go）伪造 nginx 欢迎页实现，
+      # 不需要、也不应该再叠一层真 nginx（那会泄露 Server: nginx/<版本>）。
+      - "127.0.0.1:${ARTEX_PORT:-8787}:${ARTEX_PORT:-8787}"
       - "127.0.0.1:8788:8788"
     volumes:
       # 数据目录（sessions/transcripts/tasks/traffic 等）持久化。
