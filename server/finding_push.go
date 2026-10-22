@@ -33,14 +33,26 @@ func (r pushFindingRecorder) Record(
 	}
 
 	sev := strings.ToLower(strings.TrimSpace(in.Severity))
-	if sev != "critical" && sev != "high" {
+	eventKey := ""
+	title := ""
+	switch sev {
+	case "critical":
+		eventKey = "finding.critical"
+		title = "发现严重漏洞"
+	case "high":
+		eventKey = "finding.high"
+		title = "发现高危漏洞"
+	case "medium":
+		eventKey = "finding.medium"
+		title = "发现中危漏洞"
+	case "low":
+		eventKey = "finding.low"
+		title = "发现低危漏洞"
+	default:
+		// 未知等级不推送，避免脏数据变成噪音
 		return rec, nil
 	}
 
-	title := "发现高危漏洞"
-	if sev == "critical" {
-		title = "发现严重漏洞"
-	}
 	body := strings.TrimSpace(in.Name)
 	if body == "" {
 		body = in.VulnClass
@@ -49,7 +61,7 @@ func (r pushFindingRecorder) Record(
 		body = "任务 #" + itoa(in.TaskID)
 	}
 
-	go r.s.NotifyPush(title, body, "/m/findings")
+	go r.s.notifyEvent(eventKey, title, body, "/m/findings")
 	return rec, nil
 }
 

@@ -164,7 +164,30 @@ func New(ctx context.Context, m *Manager, skillDir string, dataDir string, keyDi
 		taskAgents: map[string]*taskAgentBundle{}, archiveWake: make(chan struct{}, 1)}
 	s.initSideQuestions()
 	// Web Push：把推送发送器挂到包级回调上，供 Manager 在任务终态时触发。
-	pushNotifier = s.NotifyPush
+	pushNotifier = s.notifyEvent
+
+	// 人工介入推送：拦截器创建待审批记录时通知手机。
+	// agent 会一直阻塞到有人审批，这条通知是外面唯一的线索。
+	m.interceptor.SetPendingNotifier(func(taskID, agentName, toolName, reason string) {
+		body := agentName
+		if body == "" {
+			body = toolName
+		}
+		if body == "" && taskID != "" {
+			body = "任务 #" + taskID
+		}
+		if body == "" {
+			body = "有工具调用被拦截"
+		}
+		if reason != "" {
+			body += " · " + reason
+		}
+		url := "/m/"
+		if taskID != "" {
+			url = "/m/tasks/" + taskID
+		}
+		s.notifyEvent("agent.blocked", "有操作等待人工审批", body, url)
+	})
 	s.initStage(dataDir)        // 受管文件投递暂存(F13);失败降级为关闭,不影响启动
 	checkToolsManifest(dataDir) // 期 6 外部工具清单自检(缺失常态,只打汇总日志)
 	// 熔断阈值/冷却是失败路径上的热参数，启动时把全局重试策略推给 Registry 一次；
@@ -698,6 +721,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/auth/init", s.authInit)
 	mux.HandleFunc("POST /api/auth/login", s.authLogin)
 	mux.HandleFunc("POST /api/auth/change-password", s.authChangePassword)
+	mux.HandleFunc("GET /api/auth/logins", s.authLoginHistory)
 	mux.HandleFunc("POST /api/auth/refresh", s.authRefresh)
 	mux.HandleFunc("POST /api/auth/logout", s.authLogout)
 
@@ -711,6 +735,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/push/unsubscribe", s.pushUnsubscribe)
 	mux.HandleFunc("GET /api/push/status", s.pushStatus)
 	mux.HandleFunc("POST /api/push/test", s.pushTest)
+	mux.HandleFunc("GET /api/push/preferences", s.pushPreferencesGet)
+	mux.HandleFunc("PUT /api/push/preferences", s.pushPreferencesPut)
 
 	mux.HandleFunc("GET /api/health", s.health)
 	mux.HandleFunc("GET /api/stats", s.stats)

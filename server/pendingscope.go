@@ -111,7 +111,7 @@ func (s *Server) notifyPendingScope(taskID int64, seg, exampleIP string) {
 		if exampleIP != "" {
 			body += "（示例 IP " + exampleIP + "）"
 		}
-		go pushNotifier("任务请求扩范围", body, "/m/tasks/"+strconv.FormatInt(taskID, 10))
+		go pushNotifier("task.scope_request", "任务请求扩范围", body, "/m/tasks/"+strconv.FormatInt(taskID, 10))
 	}
 }
 

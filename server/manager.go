@@ -1702,23 +1702,33 @@ func (m *Manager) SetTaskStatus(id, status string) error {
 	}
 	m.mu.Unlock()
 
-	// 任务进入终态时推送到手机。异步执行，不阻塞状态写入；
-	// 只在「非终态 -> 终态」跳变时发，避免重复通知。
-	if pgdb.IsTerminal(status) && !pgdb.IsTerminal(prevStatus) && pushNotifier != nil {
-		title := "任务已结束"
-		switch status {
-		case "done":
-			title = "任务已完成"
-		case "failed":
-			title = "任务失败"
-		case "timeout":
-			title = "任务超时"
-		}
+	// 任务状态跳变时推送到手机。异步执行，不阻塞状态写入；
+	// 只在状态真正变化时发，避免重复通知。
+	if pushNotifier != nil && status != prevStatus {
 		body := taskLabel
 		if body == "" {
 			body = "任务 #" + id
 		}
-		go pushNotifier(title, body, "/m/tasks/"+id)
+		url := "/m/tasks/" + id
+
+		switch {
+		case pgdb.IsTerminal(status) && !pgdb.IsTerminal(prevStatus):
+			eventKey := "task.done"
+			title := "任务已完成"
+			switch status {
+			case "failed":
+				eventKey = "task.failed"
+				title = "任务失败"
+			case "timeout":
+				eventKey = "task.timeout"
+				title = "任务超时"
+			}
+			go pushNotifier(eventKey, title, body, url)
+		case status == "paused" && prevStatus != "paused":
+			go pushNotifier("task.paused", "任务已暂停", body, url)
+		case status == "running" && prevStatus != "running":
+			go pushNotifier("task.started", "任务开始运行", body, url)
+		}
 	}
 	return nil
 }

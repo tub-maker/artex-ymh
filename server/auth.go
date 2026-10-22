@@ -515,17 +515,22 @@ func (s *Server) authLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if req.Username != "ARTEX" {
+		s.recordAuthLogin(r, false, "用户名或密码错误")
 		writeErr(w, 401, "用户名或密码错误")
 		return
 	}
 	hash, ok, _ := pg.GetSetting(authPassKey)
 	if !ok || hash == "" {
+		s.recordAuthLogin(r, false, "密码未初始化")
 		writeErr(w, 403, "密码未初始化，请先设置密码")
 		return
 	}
 	if err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(req.Password)); err != nil {
+		s.recordAuthLogin(r, false, "用户名或密码错误")
 		writeErr(w, 401, "用户名或密码错误")
 		return
 	}
+	// 登录成功也记一笔：日后能对照「这个时间、这个 IP 是不是我自己」
+	s.recordAuthLogin(r, true, "")
 	s.issueSession(w, r, pg)
 }

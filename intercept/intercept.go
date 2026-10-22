@@ -130,6 +130,19 @@ type Interceptor struct {
 	enabledTools map[string]bool // nil means not loaded yet
 	pending      *pendingManager
 	reviewer     Reviewer // nil = LLM fallback judge not wired
+
+	// pendingNotifier 在创建待审批记录后回调，用于通知宿主（推送/告警）。
+	// 刻意不传 *Server：intercept 包不该依赖宿主。nil = 不通知。
+	// taskID 用 string：上下文里的任务 ID 本来就是字符串（空串=无任务）。
+	pendingNotifier func(taskID, agentName, toolName, reason string)
+}
+
+// SetPendingNotifier installs the callback fired after a pending approval row
+// is created (i.e. an agent is blocked waiting for a human). Passing nil disables it.
+func (i *Interceptor) SetPendingNotifier(fn func(taskID, agentName, toolName, reason string)) {
+	i.mu.Lock()
+	i.pendingNotifier = fn
+	i.mu.Unlock()
 }
 
 // SetReviewer installs the LLM fallback judge callback. Passing nil disables it.
@@ -622,6 +635,15 @@ func (i *Interceptor) HandleAsk(ctx context.Context, convID int64, dec Decision,
 	pendingID, err := i.db.CreateInterceptPending(ruleID, convID, taskID, agentName, toolName, input, dec.Message, audit)
 	if err != nil {
 		return false
+	}
+
+	// 有审批卡住了 → 通知宿主（推送）。agent 会一直阻塞到有人处理，
+	// 人在外面时这条通知就是唯一线索。异步执行，不阻塞审批主流程。
+	i.mu.RLock()
+	notifier := i.pendingNotifier
+	i.mu.RUnlock()
+	if notifier != nil {
+		go notifier(taskID, agentName, toolName, dec.Message)
 	}
 
 	i.bindResult(ctx, pendingID, audit)

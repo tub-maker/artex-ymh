@@ -1369,3 +1369,31 @@ CREATE TABLE IF NOT EXISTS push_subscriptions (
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     last_ok_at TIMESTAMPTZ
 );
+
+-- =====================================================================
+-- O. 登录记录（安全审计：谁在什么时候、从哪个 IP 登录过）
+-- =====================================================================
+-- 目的：异地/陌生 IP 登录能留下痕迹，而不是"被别人登了也不知道"。
+-- 只保留最近若干条（写入时裁剪），避免无限增长。
+-- reason 记录失败原因，成功时为空串。
+CREATE TABLE IF NOT EXISTS auth_logins (
+    id     BIGSERIAL PRIMARY KEY,
+    at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+    ip     TEXT NOT NULL DEFAULT '',
+    ua     TEXT NOT NULL DEFAULT '',
+    ok     BOOLEAN NOT NULL DEFAULT false,
+    reason TEXT NOT NULL DEFAULT ''
+);
+CREATE INDEX IF NOT EXISTS idx_auth_logins_at ON auth_logins (at DESC);
+
+-- =====================================================================
+-- P. 推送事件偏好（用户勾选哪些事件要推到手机）
+-- =====================================================================
+-- 之前勾选只存在 App 本地，后端不知道，等于摆设。
+-- 这里存成 key-value：event_key 用 App 侧的事件标识（task.done 等）。
+-- 没有记录时按代码里的默认值处理（见 server/push_events.go 的 catalog）。
+CREATE TABLE IF NOT EXISTS push_preferences (
+    event_key  TEXT PRIMARY KEY,
+    enabled    BOOLEAN NOT NULL DEFAULT true,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);

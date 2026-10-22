@@ -28,9 +28,10 @@ const (
 	pushVAPIDPubSetting  = "push_vapid_public_v1"
 )
 
-// pushNotifier 是给 Manager 用的包级回调：任务终态时触发推送。
+// pushNotifier 是给 Manager 用的包级回调：任务状态变更时触发推送。
+// 签名带 eventKey，让上层能按用户偏好过滤（见 server/push_events.go）。
 // 由 Server 构造时注入；nil 表示推送未启用（数据库不可用）。
-var pushNotifier func(title, body, url string)
+var pushNotifier func(eventKey, title, body, url string)
 
 // pushKeys 返回 VAPID 密钥对，首次调用时生成并持久化。
 func (s *Server) pushKeys() (priv, pub string, err error) {
