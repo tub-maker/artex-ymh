@@ -229,6 +229,24 @@ func (s *CredentialStore) Delete(ctx context.Context, id int64) error {
 	return err
 }
 
+// Reveal 解密返回明文。
+//
+// 列表只回掩码是「防误看」，不是「防本人」——要拄密码去登录时必须能取原文。
+// 调用方负责鲉权与审计（server 层每次明文读取都记日志）。
+func (s *CredentialStore) Reveal(ctx context.Context, id int64) (string, error) {
+	rec, err := s.Get(ctx, id)
+	if err != nil {
+		return "", err
+	}
+	if rec == nil {
+		return "", fmt.Errorf("凭据不存在")
+	}
+	if rec.DecryptFailed {
+		return "", fmt.Errorf("该凭据此前解密失败，密钥可能已更换")
+	}
+	return s.decrypt(rec.Secret)
+}
+
 // MaskSecret 脱敏展示:只露前后各 2 字符,其余掩码;过短(≤4 字符)全掩码。
 func MaskSecret(s string) string {
 	r := []rune(s)

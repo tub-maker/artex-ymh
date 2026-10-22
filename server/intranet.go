@@ -525,6 +525,29 @@ func (s *Server) intranetListCredentials(w http.ResponseWriter, r *http.Request)
 	writeJSON(w, 200, map[string]any{"items": items})
 }
 
+// GET /api/credentials/{id}/reveal — 明文查看单条凭据。
+//
+// 列表只回掩码是防误看，不是防本人：要拄密码去登录时必须能取原文。
+// 每次明文读取都记日志（凭据 id + 来源 IP），便于事后追溯。
+func (s *Server) intranetRevealCredential(w http.ResponseWriter, r *http.Request) {
+	if s.credStore == nil {
+		writeErr(w, 503, "凭据子系统未就绪(DB 未连接)")
+		return
+	}
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil || id <= 0 {
+		writeErr(w, 400, "凭据 id 无效")
+		return
+	}
+	plain, err := s.credStore.Reveal(r.Context(), id)
+	if err != nil {
+		writeErr(w, 500, "解密失败: "+err.Error())
+		return
+	}
+	log.Printf("[credentials] 明文查看 id=%d from=%s", id, clientIP(r))
+	writeJSON(w, 200, map[string]any{"id": id, "secret": plain})
+}
+
 // ---------------- 拓扑组装(纯函数,可测) ----------------
 
 type topoNode struct {

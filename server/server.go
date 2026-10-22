@@ -1014,6 +1014,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/tunnels", s.intranetListTunnels)
 	mux.HandleFunc("POST /api/tunnels/{id}/teardown", s.intranetTeardownTunnel)
 	mux.HandleFunc("GET /api/credentials", s.intranetListCredentials)
+	// 明文查看：列表只回掩码是防误看，不是防本人。每次读取都记日志。
+	mux.HandleFunc("GET /api/credentials/{id}/reveal", s.intranetRevealCredential)
 	mux.HandleFunc("GET /api/intranet/topology", s.intranetTopology)
 
 	// /api/* goes through CORS + JWT; everything else is served by the embedded
