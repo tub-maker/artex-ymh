@@ -518,6 +518,8 @@ func (s *Server) intranetListCredentials(w http.ResponseWriter, r *http.Request)
 			"cred_type": c.CredType, "secret_masked": db.MaskSecret(c.Secret),
 			"domain": c.Domain, "source": c.Source, "verified": c.Verified,
 			"host_asset_id": c.HostAssetID, "created_at": c.CreatedAt,
+			// 密钥与当初不一致时解不开，单独标出来，不让整个列表失败
+			"decrypt_failed": c.DecryptFailed,
 		})
 	}
 	writeJSON(w, 200, map[string]any{"items": items})

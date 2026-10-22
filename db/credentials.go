@@ -38,6 +38,11 @@ type CredentialRecord struct {
 	Source      string    `json:"source"`
 	Verified    bool      `json:"verified"`
 	CreatedAt   time.Time `json:"created_at"`
+
+	// DecryptFailed 表示这条记录的 secret 无法解密（多半是当初的密钥
+	// 和现在的 jwt.key 不一致，比如换过部署）。
+	// 单条坏数据不该让整个列表 500，所以标记后继续返回。
+	DecryptFailed bool `json:"decrypt_failed,omitempty"`
 }
 
 // ValidCredType 校验凭据类型。
@@ -153,7 +158,11 @@ func (s *CredentialStore) scan(row interface{ Scan(...any) error }) (*Credential
 	}
 	plain, err := s.decrypt(enc)
 	if err != nil {
-		return nil, fmt.Errorf("credential %d: %w", r.ID, err)
+		// 不再直接返回错误：一条解不开就把整张表拖挂，
+		// 用户连其他正常凭据都看不到。标记后继续。
+		r.Secret = ""
+		r.DecryptFailed = true
+		return &r, nil
 	}
 	r.Secret = plain
 	return &r, nil
