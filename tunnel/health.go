@@ -70,7 +70,7 @@ func (m *Manager) healthRound(ctx context.Context, decisive bool, retry map[int6
 		var p Plan
 		if err := json.Unmarshal(rec.DeployParams, &p); err != nil {
 			_ = m.store.UpdateState(ctx, rec.ID, db.TunnelError, "deploy_params 解析失败： "+err.Error())
-			m.notifyState(rec.TaskID)
+			m.notifyState(rec.TaskID, db.TunnelError)
 			continue
 		}
 		if rec.State == db.TunnelAlive {
@@ -83,7 +83,7 @@ func (m *Manager) healthRound(ctx context.Context, decisive bool, retry map[int6
 			}
 			log.Printf("[tunnel] 隧道 %d 探活失败： %v", rec.ID, err)
 			_ = m.store.UpdateState(ctx, rec.ID, db.TunnelError, err.Error())
-			m.notifyState(rec.TaskID)
+			m.notifyState(rec.TaskID, db.TunnelError)
 		}
 		m.maybeRedeploy(ctx, rec.ID, &p, retry)
 	}
@@ -164,7 +164,7 @@ func (m *Manager) maybeRedeploy(ctx context.Context, id int64, p *Plan, retry ma
 		rs.count = 0 // 复活成功，退避计数清零
 		log.Printf("[tunnel] 隧道 %d 重拉成功，已恢复 alive", id)
 	}
-	m.notifyState(p.TaskID)
+	m.notifyState(p.TaskID, db.TunnelAlive)
 }
 
 // rollbackKeepRow 重拉失败时清层但保留台账行（error 状态等下一轮）。
@@ -202,7 +202,7 @@ func (m *Manager) Teardown(ctx context.Context, id int64) error {
 		}
 		m.killServer(id, &p)
 		err = m.store.UpdateState(ctx, id, db.TunnelStopped, "")
-		m.notifyState(rec.TaskID)
+		m.notifyState(rec.TaskID, db.TunnelStopped)
 		return err
 	}
 	if p.RemotePID > 0 {
@@ -223,7 +223,7 @@ func (m *Manager) Teardown(ctx context.Context, id int64) error {
 		_ = os.Remove(p.AuthFile)
 	}
 	err = m.store.UpdateState(ctx, id, db.TunnelStopped, "")
-	m.notifyState(rec.TaskID)
+	m.notifyState(rec.TaskID, db.TunnelStopped)
 	return err
 }
 
@@ -260,7 +260,7 @@ func (m *Manager) MarkOrphansError(ctx context.Context) {
 	}
 	for _, r := range recs {
 		_ = m.store.UpdateState(ctx, r.ID, db.TunnelError, "平台重启，server 进程已消亡，待健康巡检自动重拉")
-		m.notifyState(r.TaskID)
+		m.notifyState(r.TaskID, db.TunnelError)
 	}
 }
 

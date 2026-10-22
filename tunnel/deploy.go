@@ -52,6 +52,8 @@ type Manager struct {
 	// OnStateChange 是隧道状态变化钩子（期 3b:server 层挂任务 MITM 上游热切换）。
 	// 在 alive/error/stopped 每次落定后触发,参数为归属任务 id。
 	OnStateChange func(taskID int64)
+	// OnStateNotify 带状态值，供 server 层推送到手机（tunnel.up / tunnel.down）。
+	OnStateNotify func(taskID int64, state string)
 
 	procs map[int64]*exec.Cmd // tunnel_id → 本进程拉起的 server（进程台账内存面）
 }
@@ -209,15 +211,21 @@ func (m *Manager) Deploy(ctx context.Context, p *Plan) (*db.TunnelRecord, error)
 	if err := m.store.UpdateState(ctx, id, db.TunnelAlive, ""); err != nil {
 		log.Printf("[tunnel] 状态回写失败(id=%d): %v", id, err)
 	}
-	m.notifyState(p.TaskID)
+	m.notifyState(p.TaskID, db.TunnelAlive)
 	rec, _ = m.store.Get(ctx, id)
 	return rec, nil
 }
 
 // notifyState 触发状态变化钩子（server 层据此热切换任务 MITM 上游）。
-func (m *Manager) notifyState(taskID int64) {
-	if m.OnStateChange != nil && taskID > 0 {
+func (m *Manager) notifyState(taskID int64, state string) {
+	if taskID <= 0 {
+		return
+	}
+	if m.OnStateChange != nil {
 		m.OnStateChange(taskID)
+	}
+	if m.OnStateNotify != nil {
+		m.OnStateNotify(taskID, state)
 	}
 }
 

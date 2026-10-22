@@ -222,7 +222,7 @@ func (m *Manager) deploySuo5(ctx context.Context, p *Plan) (*db.TunnelRecord, er
 	if err := m.store.UpdateState(ctx, id, db.TunnelAlive, ""); err != nil {
 		log.Printf("[tunnel] 状态回写失败（id=%d): %v", id, err)
 	}
-	m.notifyState(p.TaskID)
+	m.notifyState(p.TaskID, db.TunnelAlive)
 	rec, _ = m.store.Get(ctx, id)
 	return rec, nil
 }

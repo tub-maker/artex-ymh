@@ -8,6 +8,7 @@ import (
 	"context"
 	"encoding/json"
 	"log"
+	"strconv"
 
 	"github.com/Autumn-27/artex/agent"
 	"github.com/Autumn-27/artex/db"
@@ -88,6 +89,15 @@ func (s *Server) addCredentialTool() actool.CoreTool {
 			if err != nil {
 				return actool.Errorf("凭据落库失败:" + err.Error()), nil
 			}
+			// 推送到手机：新凭据往往意味着新的横向入口。
+			body := rec.Username
+			if rec.Domain != "" {
+				body += " @ " + rec.Domain
+			}
+			if body == "" {
+				body = "任务 #" + strconv.FormatInt(ri.TaskID, 10)
+			}
+			go s.notifyEvent("credential.new", "发现新凭据", body, "/m/")
 			return jsonResult(map[string]any{"credential_id": id})
 		},
 	})

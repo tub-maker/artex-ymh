@@ -62,6 +62,17 @@ func (s *Server) initTunnels(dataDir string) {
 	mgr.OnListenStop = unregisterManagedPort
 	// 期 3b:隧道状态变化(新增/死亡/重拉/teardown)→ 热切换该任务 MITM 实例上游。
 	mgr.OnStateChange = s.m.RefreshTaskProxy
+	// 推送到手机：隧道断开 / 恢复。
+	mgr.OnStateNotify = func(taskID int64, state string) {
+		body := "任务 #" + strconv.FormatInt(taskID, 10)
+		url := "/m/tasks/" + strconv.FormatInt(taskID, 10)
+		switch state {
+		case db.TunnelAlive:
+			go s.notifyEvent("tunnel.up", "隧道已恢复", body, url)
+		case db.TunnelError, db.TunnelStopped:
+			go s.notifyEvent("tunnel.down", "隧道断开", body, url)
+		}
+	}
 	s.tunnels = mgr
 	mgr.MarkOrphansError(s.ctx) // 平台重启 = server 进程全灭，诚实标 error，巡检按 deploy_params 重拉
 	mgr.StartHealth(s.ctx)

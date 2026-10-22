@@ -546,5 +546,18 @@ func (s *Server) insertAssets(w http.ResponseWriter, r *http.Request) {
 		}
 		results = append(results, result{Index: i, ID: id, Type: a.Type})
 	}
+	// 推送到手机：新资产往往意味着新攻击面。
+	// 批量登记只发一条汇总，避免一次导入刷屏。
+	if len(results) > 0 {
+		body := strconv.Itoa(len(results)) + " 个新资产"
+		if len(results) == 1 {
+			body = results[0].Type + " 资产"
+		}
+		url := "/m/"
+		if req.TaskID > 0 {
+			url = "/m/tasks/" + strconv.FormatInt(req.TaskID, 10)
+		}
+		go s.notifyEvent("asset.new", "发现新资产", body, url)
+	}
 	writeJSON(w, 200, map[string]any{"results": results, "errors": errs})
 }
