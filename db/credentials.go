@@ -244,7 +244,10 @@ func (s *CredentialStore) Reveal(ctx context.Context, id int64) (string, error) 
 	if rec.DecryptFailed {
 		return "", fmt.Errorf("该凭据此前解密失败，密钥可能已更换")
 	}
-	return s.decrypt(rec.Secret)
+	// Get 已经把 secret 解出来了（scan 里 decrypt 过一次）。
+	// 这里再 decrypt 一次等于对明文二次解密，必然报
+	// 「未知 secret 格式(缺 gcm1: 前缀)」—— 之前就是这样 500 的。
+	return rec.Secret, nil
 }
 
 // MaskSecret 脱敏展示:只露前后各 2 字符,其余掩码;过短(≤4 字符)全掩码。
